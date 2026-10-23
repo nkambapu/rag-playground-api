@@ -6,6 +6,19 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, Field, ValidationError
 
+from app.api.schemas import (
+    Document,
+    DocumentChunks,
+    Health,
+    IndexResult,
+    Preset,
+    QueryResult,
+    ResolveResult,
+    Run,
+    RunSummary,
+    StepInfo,
+    UploadResult,
+)
 from app.pipeline.base import INGESTION_STEPS, REGISTRY, STEPS
 from app.pipeline.components.vector_stores import delete_document_vectors
 from app.pipeline.config import DEFAULT_IMPLS, ConfigError, ConfigRequest, ResolvedConfig, StepOverride, resolve
@@ -52,7 +65,7 @@ def require_document(store: Store, document_id: str) -> dict[str, Any]:
 
 
 @router.get("/health")
-def health() -> dict[str, Any]:
+def health() -> Health:
     import ollama
 
     settings = get_settings()
@@ -65,7 +78,7 @@ def health() -> dict[str, Any]:
 
 
 @router.get("/pipeline/options")
-def pipeline_options() -> list[dict[str, Any]]:
+def pipeline_options() -> list[StepInfo]:
     """Every step with its implementations, default settings and JSON schema for the settings form."""
     return [
         {
@@ -90,7 +103,7 @@ def pipeline_options() -> list[dict[str, Any]]:
 
 
 @router.post("/pipeline/resolve")
-def resolve_pipeline(store: StoreDep, body: ConfigRequest) -> dict[str, Any]:
+def resolve_pipeline(store: StoreDep, body: ConfigRequest) -> ResolveResult:
     """Validates a config and returns the full settings, the index key and what differs from defaults."""
     config = resolve_config(store, body)
     return {"config": config.model_dump(), "index_key": config.index_key, "overridden": config.overridden()}
@@ -104,12 +117,12 @@ class PresetBody(BaseModel):
 
 
 @router.get("/presets")
-def list_presets(store: StoreDep) -> list[dict[str, Any]]:
+def list_presets(store: StoreDep) -> list[Preset]:
     return store.list_presets()
 
 
 @router.put("/presets/{name}")
-def save_preset(store: StoreDep, name: str, body: PresetBody) -> dict[str, Any]:
+def save_preset(store: StoreDep, name: str, body: PresetBody) -> Preset:
     if name == "default" or not PRESET_NAME.match(name):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Preset names use letters, numbers, spaces, - and _ ('default' is reserved)"
@@ -128,7 +141,7 @@ def delete_preset(store: StoreDep, name: str) -> None:
 
 
 @router.get("/documents")
-def list_documents(store: StoreDep) -> list[dict[str, Any]]:
+def list_documents(store: StoreDep) -> list[Document]:
     return store.list_documents()
 
 
@@ -138,7 +151,7 @@ async def upload_document(
     pipeline: PipelineDep,
     file: UploadFile,
     config: Annotated[str | None, Form(description="Optional ConfigRequest as JSON")] = None,
-) -> dict[str, Any]:
+) -> UploadResult:
     """Uploads a file and indexes it with the given configuration (defaults if omitted)."""
     settings = get_settings()
     suffix = Path(file.filename or "").suffix.lower()
@@ -170,7 +183,7 @@ async def upload_document(
 
 
 @router.get("/documents/{document_id}")
-def get_document(store: StoreDep, document_id: str) -> dict[str, Any]:
+def get_document(store: StoreDep, document_id: str) -> Document:
     return require_document(store, document_id)
 
 
@@ -183,7 +196,7 @@ def delete_document(store: StoreDep, document_id: str) -> None:
 
 
 @router.post("/documents/{document_id}/index")
-def index_document(store: StoreDep, pipeline: PipelineDep, document_id: str, body: ConfigRequest) -> dict[str, Any]:
+def index_document(store: StoreDep, pipeline: PipelineDep, document_id: str, body: ConfigRequest) -> IndexResult:
     """(Re)indexes a document with the given configuration."""
     require_document(store, document_id)
     return pipeline.index(document_id, resolve_config(store, body))
@@ -194,7 +207,7 @@ def document_chunks(
     store: StoreDep,
     document_id: str,
     index_key: Annotated[str | None, Query(description="Defaults to the index built with default settings")] = None,
-) -> dict[str, Any]:
+) -> DocumentChunks:
     """The indexed text and its chunks with character offsets, for the chunk viewer."""
     require_document(store, document_id)
     key = index_key or resolve(None).index_key
@@ -215,7 +228,7 @@ class QueryBody(BaseModel):
 
 
 @router.post("/query")
-def query(store: StoreDep, pipeline: PipelineDep, body: QueryBody) -> dict[str, Any]:
+def query(store: StoreDep, pipeline: PipelineDep, body: QueryBody) -> QueryResult:
     config = resolve_config(store, body.config)
     document_ids = body.document_ids or [d["id"] for d in store.list_documents()]
     if not document_ids:
@@ -226,12 +239,12 @@ def query(store: StoreDep, pipeline: PipelineDep, body: QueryBody) -> dict[str, 
 
 
 @router.get("/runs")
-def list_runs(store: StoreDep, limit: Annotated[int, Query(ge=1, le=200)] = 50) -> list[dict[str, Any]]:
+def list_runs(store: StoreDep, limit: Annotated[int, Query(ge=1, le=200)] = 50) -> list[RunSummary]:
     return store.list_runs(limit)
 
 
 @router.get("/runs/{run_id}")
-def get_run(store: StoreDep, run_id: str) -> dict[str, Any]:
+def get_run(store: StoreDep, run_id: str) -> Run:
     run = store.get_run(run_id)
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Run {run_id} not found")

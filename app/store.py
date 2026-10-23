@@ -91,10 +91,15 @@ class Store:
 
     def _with_indexes(self, doc: dict[str, Any]) -> dict[str, Any]:
         rows = self._execute(
-            "SELECT index_key, chunk_count, created_at FROM indexed_documents WHERE document_id = ? ORDER BY created_at",
+            "SELECT index_key, chunk_count, config_json, created_at FROM indexed_documents"
+            " WHERE document_id = ? ORDER BY created_at",
             (doc["id"],),
         )
-        doc["indexes"] = [dict(r) for r in rows]
+        doc["indexes"] = [
+            {"index_key": r["index_key"], "chunk_count": r["chunk_count"], "config": json.loads(r["config_json"]),
+             "created_at": r["created_at"]}
+            for r in rows
+        ]
         return doc
 
     def delete_document(self, doc_id: str) -> None:

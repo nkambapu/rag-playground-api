@@ -4,6 +4,8 @@ The backend for **RAG Playground**, a tool that makes every step of a Retrieval-
 
 Runs entirely on local, open-source models through [Ollama](https://ollama.com).
 
+Frontend: [rag-playground-ui](https://github.com/nkambapu/rag-playground-ui) (React + TypeScript).
+
 ## Pipeline
 
 ```
@@ -83,7 +85,9 @@ Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/) and Ollama.
 
 The first query downloads the reranker model (about 90 MB) from Hugging Face.
 
-Settings can be changed with environment variables or a `.env` file; see [.env.example](.env.example).
+Settings can be changed with environment variables or a `.env` file; see [.env.example](.env.example). Requests from any `localhost` port are allowed (for the UI's dev server); add other UI origins with `RAG_CORS_ORIGINS`.
+
+All responses use typed Pydantic models, so the OpenAPI spec at `/openapi.json` fully describes them. The UI generates its TypeScript types from it.
 
 ## API
 
@@ -138,4 +142,3 @@ The end-to-end test runs only when Ollama is reachable with `qwen3:8b` and `nomi
 - Side-by-side comparison of two configurations
 - Evaluation with RAGAS (Ollama as judge)
 - Docker Compose setup
-- Frontend: `rag-playground-ui` (React + Vite + TypeScript)
