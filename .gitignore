@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# App data (uploads, SQLite, Chroma) and local settings
+data/
+.env
+.pytest_cache/
+
+# IDE settings
+.idea/
